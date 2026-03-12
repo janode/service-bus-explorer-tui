@@ -31,6 +31,24 @@ fn send_path(entity_path: &str) -> &str {
     }
 }
 
+fn split_subscription_path(entity_path: &str) -> Option<(&str, &str)> {
+    let idx = entity_path
+        .find("/Subscriptions/")
+        .or_else(|| entity_path.find("/subscriptions/"))?;
+    let topic = &entity_path[..idx];
+    let sep_len = if entity_path[idx..].starts_with("/Subscriptions/") {
+        "/Subscriptions/".len()
+    } else {
+        "/subscriptions/".len()
+    };
+    let sub = &entity_path[idx + sep_len..];
+    if topic.is_empty() || sub.is_empty() {
+        None
+    } else {
+        Some((topic, sub))
+    }
+}
+
 /// Owned version of `send_path` for use in spawned tasks.
 fn send_path_owned(entity_path: &str) -> String {
     send_path(entity_path).to_string()
@@ -332,6 +350,21 @@ async fn run_app(terminal: &mut Terminal<CrosstermBackend<io::Stdout>>) -> anyho
                 BgEvent::DetailLoaded(detail) => {
                     app.detail_view = *detail;
                 }
+                BgEvent::SubscriptionFilterLoaded {
+                    topic_name,
+                    sub_name,
+                    rule_name,
+                    sql_expression,
+                } => {
+                    app.bg_running = false;
+                    app.init_edit_subscription_filter_form(
+                        &topic_name,
+                        &sub_name,
+                        &rule_name,
+                        &sql_expression,
+                    );
+                    app.set_status("Edit the SQL filter and press F2 to update");
+                }
                 BgEvent::PeekComplete { messages, is_dlq } => {
                     let count = messages.len();
                     if is_dlq {
@@ -403,6 +436,11 @@ async fn run_app(terminal: &mut Terminal<CrosstermBackend<io::Stdout>>) -> anyho
                     app.copy_dest_connection_name = None;
                     app.copy_dest_connection_config = None;
                     app.copy_destination_entity = None;
+                }
+                BgEvent::SubscriptionFilterUpdated { status } => {
+                    app.set_status(status);
+                    app.modal = ActiveModal::None;
+                    app.bg_running = false;
                 }
             }
         }
@@ -998,6 +1036,108 @@ async fn run_app(terminal: &mut Terminal<CrosstermBackend<io::Stdout>>) -> anyho
                         }
                     }
                 });
+            }
+        }
+
+        // Load subscription filter rules (spawned)
+        if app.status_message == "Loading subscription filters..."
+            && app.management.is_some()
+            && !app.bg_running
+        {
+            if let Some((entity_path, entity_type)) = app.selected_entity() {
+                if *entity_type == EntityType::Subscription {
+                    if let Some((topic_name, sub_name)) = split_subscription_path(entity_path) {
+                        let topic_name = topic_name.to_string();
+                        let sub_name = sub_name.to_string();
+                        let mgmt = app.management.as_ref().cloned().unwrap();
+                        let tx = app.bg_tx.clone();
+
+                        app.bg_running = true;
+                        app.set_status("Loading subscription filters...");
+
+                        tokio::spawn(async move {
+                            match mgmt.list_subscription_rules(&topic_name, &sub_name).await {
+                                Ok(rules) => {
+                                    let selected = rules
+                                        .iter()
+                                        .find(|r| r.name == "$Default")
+                                        .or_else(|| rules.first());
+
+                                    let (rule_name, sql_expression) = selected
+                                        .map(|r| (r.name.clone(), r.sql_expression.clone()))
+                                        .unwrap_or_else(|| {
+                                            ("$Default".to_string(), "1=1".to_string())
+                                        });
+
+                                    let _ = tx.send(BgEvent::SubscriptionFilterLoaded {
+                                        topic_name,
+                                        sub_name,
+                                        rule_name,
+                                        sql_expression,
+                                    });
+                                }
+                                Err(e) => {
+                                    let _ = tx.send(BgEvent::Failed(format!(
+                                        "Failed to load subscription filters: {}",
+                                        e
+                                    )));
+                                }
+                            }
+                        });
+                    } else {
+                        app.set_error("Invalid subscription path");
+                    }
+                }
+            }
+        }
+
+        // Submit subscription filter update (spawned)
+        if app.status_message == "Submitting..." && app.modal == ActiveModal::EditSubscriptionFilter
+        {
+            if let Some((entity_path, entity_type)) = app.selected_entity() {
+                if *entity_type == EntityType::Subscription {
+                    if let Some((topic_name, sub_name)) = split_subscription_path(entity_path) {
+                        if let Some(mgmt) = app.management.as_ref() {
+                            let mgmt = mgmt.clone();
+                            let topic_name = topic_name.to_string();
+                            let sub_name = sub_name.to_string();
+                            let (rule_name, sql_expression) = app.build_subscription_filter_from_form();
+                            let tx = app.bg_tx.clone();
+
+                            app.bg_running = true;
+                            app.set_status("Updating subscription filter...");
+
+                            tokio::spawn(async move {
+                                match mgmt
+                                    .upsert_subscription_sql_rule(
+                                        &topic_name,
+                                        &sub_name,
+                                        &rule_name,
+                                        &sql_expression,
+                                    )
+                                    .await
+                                {
+                                    Ok(_) => {
+                                        let _ = tx.send(BgEvent::SubscriptionFilterUpdated {
+                                            status: format!(
+                                                "Updated '{}' filter for subscription '{}'",
+                                                rule_name, sub_name
+                                            ),
+                                        });
+                                    }
+                                    Err(e) => {
+                                        let _ = tx.send(BgEvent::Failed(format!(
+                                            "Failed to update subscription filter: {}",
+                                            e
+                                        )));
+                                    }
+                                }
+                            });
+                        }
+                    } else {
+                        app.set_error("Invalid subscription path");
+                    }
+                }
             }
         }
 

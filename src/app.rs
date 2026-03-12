@@ -33,6 +33,12 @@ pub enum BgEvent {
         flat_nodes: Vec<FlatNode>,
     },
     DetailLoaded(Box<DetailView>),
+    SubscriptionFilterLoaded {
+        topic_name: String,
+        sub_name: String,
+        rule_name: String,
+        sql_expression: String,
+    },
     PeekComplete {
         messages: Vec<ReceivedMessage>,
         is_dlq: bool,
@@ -64,6 +70,9 @@ pub enum BgEvent {
     MessageCopyComplete {
         status: String,
     },
+    SubscriptionFilterUpdated {
+        status: String,
+    },
 }
 
 /// Which panel is currently focused.
@@ -90,6 +99,7 @@ pub enum ActiveModal {
     CreateQueue,
     CreateTopic,
     CreateSubscription,
+    EditSubscriptionFilter,
     ConfirmDelete(String),
     ConfirmBulkResend {
         entity_path: String,
@@ -623,6 +633,40 @@ impl App {
             dead_lettering_on_message_expiration: get_str(6).and_then(|v| v.parse().ok()),
             ..Default::default()
         }
+    }
+
+    /// Initialize edit subscription filter form.
+    pub fn init_edit_subscription_filter_form(
+        &mut self,
+        topic_name: &str,
+        sub_name: &str,
+        rule_name: &str,
+        sql_expression: &str,
+    ) {
+        self.input_fields = vec![
+            ("Topic".to_string(), topic_name.to_string()),
+            ("Subscription".to_string(), sub_name.to_string()),
+            ("Rule Name".to_string(), rule_name.to_string()),
+            ("SQL Filter".to_string(), sql_expression.to_string()),
+        ];
+        self.input_field_index = 3;
+        self.form_cursor = self.input_fields[3].1.len();
+        self.modal = ActiveModal::EditSubscriptionFilter;
+    }
+
+    pub fn build_subscription_filter_from_form(&self) -> (String, String) {
+        let get = |idx: usize| -> Option<String> {
+            self.input_fields.get(idx).map(|(_, v)| v.trim().to_string())
+        };
+
+        let rule_name = get(2)
+            .filter(|v| !v.is_empty())
+            .unwrap_or_else(|| "$Default".to_string());
+        let sql_expression = get(3)
+            .filter(|v| !v.is_empty())
+            .unwrap_or_else(|| "1=1".to_string());
+
+        (rule_name, sql_expression)
     }
 
     /// Start namespace discovery flow.

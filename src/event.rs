@@ -258,6 +258,18 @@ fn handle_tree_input(app: &mut App, key: KeyEvent) {
                 }
             }
         }
+        // 'f' = edit subscription SQL filter rule
+        KeyCode::Char('f') => {
+            if app.bg_running {
+                app.set_status("A background operation is in progress...");
+            } else if let Some((_, entity_type)) = app.selected_entity() {
+                if *entity_type == EntityType::Subscription {
+                    app.set_status("Loading subscription filters...");
+                } else {
+                    app.set_status("Select a subscription to edit its filter");
+                }
+            }
+        }
         _ => {}
     }
 }
@@ -965,6 +977,7 @@ fn handle_modal_input(app: &mut App, key: KeyEvent) {
         | ActiveModal::CreateQueue
         | ActiveModal::CreateTopic
         | ActiveModal::CreateSubscription
+        | ActiveModal::EditSubscriptionFilter
         | ActiveModal::CopyEditMessage => {
             handle_form_input(app, key);
         }

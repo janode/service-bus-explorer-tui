@@ -62,6 +62,12 @@ pub fn render_modal(frame: &mut Frame, app: &mut App) {
         ActiveModal::CreateSubscription => {
             render_form(frame, app, "Create Subscription", "F2 to create")
         }
+        ActiveModal::EditSubscriptionFilter => render_form(
+            frame,
+            app,
+            "Edit Subscription Filter",
+            "F2 to update filter",
+        ),
         ActiveModal::ConfirmDelete(path) => render_confirm_delete(frame, path),
         ActiveModal::ConfirmBulkResend {
             entity_path, count, ..

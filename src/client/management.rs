@@ -183,6 +183,18 @@ fn subscription_description_xml(desc: &SubscriptionDescription) -> String {
     xml
 }
 
+fn to_cdata_safe(value: &str) -> String {
+    value.replace("]]>", "]]]]><![CDATA[>")
+}
+
+fn subscription_rule_sql_xml(sql_expression: &str) -> String {
+    let expr = to_cdata_safe(sql_expression);
+    format!(
+        r#"<RuleDescription xmlns="http://schemas.microsoft.com/netservices/2010/10/servicebus/connect" xmlns:i="http://www.w3.org/2001/XMLSchema-instance"><Filter i:type="SqlFilter"><SqlExpression><![CDATA[{}]]></SqlExpression></Filter><Action i:nil="true" /></RuleDescription>"#,
+        expr
+    )
+}
+
 // ──────────────────────────── Implementation ────────────────────────────
 
 impl ManagementClient {
@@ -381,6 +393,55 @@ impl ManagementClient {
     pub async fn delete_subscription(&self, topic_name: &str, sub_name: &str) -> Result<()> {
         self.delete_entity(&format!("{}/Subscriptions/{}", topic_name, sub_name))
             .await
+    }
+
+    pub async fn list_subscription_rules(
+        &self,
+        topic_name: &str,
+        sub_name: &str,
+    ) -> Result<Vec<SubscriptionRule>> {
+        let xml = self
+            .get_atom(&format!("{}/Subscriptions/{}/Rules", topic_name, sub_name))
+            .await?;
+        parse_subscription_rule_feed(&xml)
+    }
+
+    pub async fn upsert_subscription_sql_rule(
+        &self,
+        topic_name: &str,
+        sub_name: &str,
+        rule_name: &str,
+        sql_expression: &str,
+    ) -> Result<()> {
+        let trimmed_rule_name = rule_name.trim();
+        if trimmed_rule_name.is_empty() {
+            return Err(ServiceBusError::Operation(
+                "Rule name cannot be empty".to_string(),
+            ));
+        }
+
+        if sql_expression.trim().is_empty() {
+            return Err(ServiceBusError::Operation(
+                "SQL filter expression cannot be empty".to_string(),
+            ));
+        }
+
+        let body = wrap_atom_entry(&subscription_rule_sql_xml(sql_expression.trim()));
+        let path = format!(
+            "{}/Subscriptions/{}/Rules/{}",
+            topic_name, sub_name, trimmed_rule_name
+        );
+        match self.put_atom(&path, &body).await {
+            Ok(_) => {}
+            Err(ServiceBusError::Api { status: 409, .. }) => {
+                // Rules are create-only in some Service Bus API paths. If the rule
+                // already exists, replace it explicitly.
+                self.delete_entity(&path).await?;
+                self.put_atom(&path, &body).await?;
+            }
+            Err(e) => return Err(e),
+        }
+        Ok(())
     }
 }
 
@@ -691,4 +752,23 @@ fn parse_subscription_runtime_info(
         updated_at: extract_element_value(xml, "UpdatedAt"),
         accessed_at: extract_element_value(xml, "AccessedAt"),
     })
+}
+
+fn parse_subscription_rule_from_entry(entry_xml: &str) -> SubscriptionRule {
+    let name = extract_title(entry_xml);
+    let sql_expression = extract_value_any_ns(entry_xml, "SqlExpression")
+        .or_else(|| extract_value_any_ns(entry_xml, "Expression"))
+        .unwrap_or_else(|| "1=1".to_string());
+
+    SubscriptionRule {
+        name,
+        sql_expression,
+    }
+}
+
+fn parse_subscription_rule_feed(xml: &str) -> Result<Vec<SubscriptionRule>> {
+    Ok(extract_entries(xml)
+        .into_iter()
+        .map(|e| parse_subscription_rule_from_entry(&e))
+        .collect())
 }

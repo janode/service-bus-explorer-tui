@@ -97,6 +97,12 @@ pub struct SubscriptionRuntimeInfo {
     pub accessed_at: Option<String>,
 }
 
+#[derive(Debug, Clone, Serialize, Deserialize, Default)]
+pub struct SubscriptionRule {
+    pub name: String,
+    pub sql_expression: String,
+}
+
 // ──────────────────────────── Message Models ────────────────────────────
 
 #[derive(Debug, Clone, Serialize, Deserialize)]

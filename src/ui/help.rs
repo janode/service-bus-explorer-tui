@@ -36,6 +36,7 @@ pub fn render_help(frame: &mut Frame) {
         )]),
         Line::from("  n              Create new entity"),
         Line::from("  x              Delete selected entity"),
+        Line::from("  f              Edit selected subscription filter"),
         Line::from(""),
         Line::from(vec![Span::styled(
             "  Message Operations",
