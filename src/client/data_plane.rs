@@ -4,6 +4,7 @@ use std::sync::atomic::{AtomicBool, AtomicU64, Ordering};
 use std::sync::Arc;
 
 use super::auth::ConnectionConfig;
+use super::entity_path;
 use super::error::{Result, ServiceBusError};
 use super::models::*;
 
@@ -25,7 +26,7 @@ impl DataPlaneClient {
     /// Normalize entity paths for the data-plane REST API.
     /// Management API uses `/Subscriptions/` but data plane expects `/subscriptions/`.
     fn normalize_path(entity_path: &str) -> String {
-        entity_path.replace("/Subscriptions/", "/subscriptions/")
+        entity_path::to_data_plane_path(entity_path)
     }
 
     // ────────── Send ──────────

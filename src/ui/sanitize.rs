@@ -61,3 +61,32 @@ pub fn sanitize_for_terminal(input: &str, allow_newlines: bool) -> String {
 
     out
 }
+
+#[cfg(test)]
+mod tests {
+    use super::sanitize_for_terminal;
+
+    #[test]
+    fn strips_csi_and_osc_escape_sequences() {
+        assert_eq!(
+            sanitize_for_terminal("hello\x1b[31mred\x1b[0m world", false),
+            "hello[CSI]red[CSI] world"
+        );
+        assert_eq!(
+            sanitize_for_terminal("title\x1b]0;tab title\x07done", false),
+            "title[OSC]done"
+        );
+    }
+
+    #[test]
+    fn preserves_allowed_whitespace_and_replaces_other_controls() {
+        assert_eq!(sanitize_for_terminal("a\nb\t\rc\x00", true), "a\nb\t\rc�");
+        assert_eq!(sanitize_for_terminal("a\nb", false), "a�b");
+    }
+
+    #[test]
+    fn handles_unknown_escape_sequences() {
+        assert_eq!(sanitize_for_terminal("x\x1bz", false), "x[ESC]");
+        assert_eq!(sanitize_for_terminal("x\x1b", false), "x[ESC]");
+    }
+}

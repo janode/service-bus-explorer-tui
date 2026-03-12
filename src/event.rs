@@ -2,6 +2,7 @@ use crossterm::event::{self, Event, KeyCode, KeyEvent, KeyEventKind, KeyModifier
 use std::time::Duration;
 
 use crate::app::{ActiveModal, App, DiscoveryState, FocusPanel, MessageTab};
+use crate::client::entity_path;
 use crate::client::models::EntityType;
 
 /// Poll for input events and process them against app state.
@@ -943,7 +944,7 @@ fn handle_modal_input(app: &mut App, key: KeyEvent) {
             KeyCode::Char('s') | KeyCode::Char('S') => {
                 // Use same entity name as source
                 if let Some(ref src_entity) = app.copy_source_entity {
-                    let entity_name = src_entity.split('/').next().unwrap_or(src_entity);
+                    let entity_name = entity_path::send_target(src_entity);
                     let exists = app
                         .copy_dest_entities
                         .iter()
@@ -1209,7 +1210,7 @@ fn find_parent_topic(app: &App) -> Option<String> {
     let selected = &app.flat_nodes[app.tree_selected];
     // The path for subscriptions is "topic_name/Subscriptions/sub_name"
     if selected.entity_type == EntityType::Subscription {
-        return selected.path.split('/').next().map(|s| s.to_string());
+        return Some(entity_path::send_target(&selected.path).to_string());
     }
     // For subscription folder, look at the parent topic
     if selected.entity_type == EntityType::SubscriptionFolder {

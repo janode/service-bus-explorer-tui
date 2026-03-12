@@ -14,44 +14,12 @@ use crossterm::{
 use ratatui::prelude::*;
 
 use app::{ActiveModal, App, BgEvent, DetailView, DiscoveryState, FocusPanel, MessageTab};
+use client::entity_path;
 use client::models::EntityType;
-
-/// Resolve an entity path to the path suitable for sending messages.
-/// Subscriptions ("topic/Subscriptions/sub") → topic name.
-/// Queues remain unchanged.
-fn send_path(entity_path: &str) -> &str {
-    // Subscription paths contain "/Subscriptions/" (case-insensitive match)
-    if let Some(idx) = entity_path
-        .find("/Subscriptions/")
-        .or_else(|| entity_path.find("/subscriptions/"))
-    {
-        &entity_path[..idx]
-    } else {
-        entity_path
-    }
-}
-
-fn split_subscription_path(entity_path: &str) -> Option<(&str, &str)> {
-    let idx = entity_path
-        .find("/Subscriptions/")
-        .or_else(|| entity_path.find("/subscriptions/"))?;
-    let topic = &entity_path[..idx];
-    let sep_len = if entity_path[idx..].starts_with("/Subscriptions/") {
-        "/Subscriptions/".len()
-    } else {
-        "/subscriptions/".len()
-    };
-    let sub = &entity_path[idx + sep_len..];
-    if topic.is_empty() || sub.is_empty() {
-        None
-    } else {
-        Some((topic, sub))
-    }
-}
 
 /// Owned version of `send_path` for use in spawned tasks.
 fn send_path_owned(entity_path: &str) -> String {
-    send_path(entity_path).to_string()
+    entity_path::send_target(entity_path).to_string()
 }
 
 /// Build a list of entity paths for purge/delete operations.
@@ -537,10 +505,9 @@ async fn run_app(terminal: &mut Terminal<CrosstermBackend<io::Stdout>>) -> anyho
                                 }
                             }
                             EntityType::Subscription => {
-                                let parts: Vec<&str> = path.split('/').collect();
-                                if parts.len() >= 3 {
-                                    let topic = parts[0];
-                                    let sub = parts[2];
+                                if let Some((topic, sub)) =
+                                    entity_path::split_subscription_path(&path)
+                                {
                                     match (
                                         mgmt.get_subscription(topic, sub).await,
                                         mgmt.get_subscription_runtime_info(topic, sub).await,
@@ -860,13 +827,10 @@ async fn run_app(terminal: &mut Terminal<CrosstermBackend<io::Stdout>>) -> anyho
                     app.set_status("Deleting entity...");
 
                     tokio::spawn(async move {
-                        let result = if path.contains("/Subscriptions/") {
-                            let parts: Vec<&str> = path.split('/').collect();
-                            if parts.len() >= 3 {
-                                mgmt.delete_subscription(parts[0], parts[2]).await
-                            } else {
-                                Err(client::ServiceBusError::Operation("Invalid path".into()))
-                            }
+                        let result = if let Some((topic, sub)) =
+                            entity_path::split_subscription_path(&path)
+                        {
+                            mgmt.delete_subscription(topic, sub).await
                         } else {
                             mgmt.delete_queue(&path)
                                 .await
@@ -895,7 +859,7 @@ async fn run_app(terminal: &mut Terminal<CrosstermBackend<io::Stdout>>) -> anyho
             if let Some(dp) = app.data_plane.as_ref() {
                 if let Some((path, _)) = app.selected_entity() {
                     let dp = dp.clone();
-                    let path = send_path(path).to_string();
+                    let path = entity_path::send_target(path).to_string();
                     let msg = app.build_message_from_form();
                     let tx = app.bg_tx.clone();
 
@@ -925,7 +889,7 @@ async fn run_app(terminal: &mut Terminal<CrosstermBackend<io::Stdout>>) -> anyho
             if let Some(dp) = app.data_plane.as_ref() {
                 if let Some((path, _)) = app.selected_entity() {
                     let dp = dp.clone();
-                    let base_path = send_path(path).to_string();
+                    let base_path = entity_path::send_target(path).to_string();
                     let entity_path = path.to_string();
                     let msg = app.build_message_from_form();
                     let dlq_seq = app.edit_source_dlq_seq.take();
@@ -1046,7 +1010,9 @@ async fn run_app(terminal: &mut Terminal<CrosstermBackend<io::Stdout>>) -> anyho
         {
             if let Some((entity_path, entity_type)) = app.selected_entity() {
                 if *entity_type == EntityType::Subscription {
-                    if let Some((topic_name, sub_name)) = split_subscription_path(entity_path) {
+                    if let Some((topic_name, sub_name)) =
+                        entity_path::split_subscription_path(entity_path)
+                    {
                         let topic_name = topic_name.to_string();
                         let sub_name = sub_name.to_string();
                         let mgmt = app.management.as_ref().cloned().unwrap();
@@ -1096,7 +1062,9 @@ async fn run_app(terminal: &mut Terminal<CrosstermBackend<io::Stdout>>) -> anyho
         {
             if let Some((entity_path, entity_type)) = app.selected_entity() {
                 if *entity_type == EntityType::Subscription {
-                    if let Some((topic_name, sub_name)) = split_subscription_path(entity_path) {
+                    if let Some((topic_name, sub_name)) =
+                        entity_path::split_subscription_path(entity_path)
+                    {
                         if let Some(mgmt) = app.management.as_ref() {
                             let mgmt = mgmt.clone();
                             let topic_name = topic_name.to_string();

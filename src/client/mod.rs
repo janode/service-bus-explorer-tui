@@ -1,5 +1,6 @@
 pub mod auth;
 pub mod data_plane;
+pub mod entity_path;
 pub mod error;
 pub mod management;
 pub mod models;
