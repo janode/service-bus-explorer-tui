@@ -262,6 +262,7 @@ jobs:
     name: Publish to Winget
     needs: release
     runs-on: ubuntu-latest
+    continue-on-error: true  # Remove once initial package is accepted in winget-pkgs
     steps:
       - uses: vedantmgoyal9/winget-releaser@v2
         with:
