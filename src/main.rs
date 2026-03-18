@@ -139,6 +139,36 @@ async fn run_app(terminal: &mut Terminal<CrosstermBackend<io::Stdout>>) -> anyho
                     app.bg_running = false;
                     needs_refresh = true;
                 }
+                BgEvent::SingleDeleteComplete {
+                    sequence_number,
+                    is_dlq,
+                } => {
+                    if is_dlq {
+                        app.dlq_messages.retain(|m| {
+                            m.broker_properties.sequence_number != Some(sequence_number)
+                        });
+                    } else {
+                        app.messages.retain(|m| {
+                            m.broker_properties.sequence_number != Some(sequence_number)
+                        });
+                    }
+                    if app.selected_message_detail.as_ref().is_some_and(|m| {
+                        m.broker_properties.sequence_number == Some(sequence_number)
+                    }) {
+                        app.selected_message_detail = None;
+                    }
+                    let len = if is_dlq {
+                        app.dlq_messages.len()
+                    } else {
+                        app.messages.len()
+                    };
+                    if app.message_selected >= len && len > 0 {
+                        app.message_selected = len - 1;
+                    }
+                    app.set_status(format!("Deleted message seq #{}", sequence_number));
+                    app.bg_running = false;
+                    needs_refresh = true;
+                }
                 BgEvent::Cancelled { message } => {
                     app.set_status(message);
                     app.bg_running = false;
@@ -1181,6 +1211,103 @@ async fn run_app(terminal: &mut Terminal<CrosstermBackend<io::Stdout>>) -> anyho
                         });
                     }
                 });
+            }
+        }
+
+        // Single message delete (messages panel x key)
+        if app.status_message == "Deleting message..."
+            && app.data_plane.is_some()
+            && !app.bg_running
+        {
+            if let ActiveModal::ConfirmSingleDelete {
+                ref entity_path,
+                sequence_number,
+                is_dlq,
+            } = app.modal
+            {
+                let dp = app.data_plane.clone().unwrap();
+                let path = entity_path.clone();
+                let seq = sequence_number;
+                let tx = app.bg_tx.clone();
+
+                app.bg_running = true;
+                app.modal = ActiveModal::None;
+                app.set_status("Deleting message...");
+
+                if is_dlq {
+                    tokio::spawn(async move {
+                        match dp.remove_from_dlq(&path, seq).await {
+                            Ok(true) => {
+                                let _ = tx.send(BgEvent::SingleDeleteComplete {
+                                    sequence_number: seq,
+                                    is_dlq: true,
+                                });
+                            }
+                            Ok(false) => {
+                                send_failed(&tx, format!("Message seq #{} not found in DLQ", seq));
+                            }
+                            Err(e) => {
+                                send_failed_with(&tx, "Delete failed", e);
+                            }
+                        }
+                    });
+                } else {
+                    tokio::spawn(async move {
+                        // For non-DLQ: peek-lock messages looking for the sequence number
+                        let mut abandoned_uris: Vec<String> = Vec::new();
+                        let max_attempts = 50u32;
+                        let mut found = false;
+
+                        for _ in 0..max_attempts {
+                            match dp.peek_lock(&path, 1).await {
+                                Ok(Some(msg)) => {
+                                    let lock_uri = match msg.lock_token_uri {
+                                        Some(ref uri) => uri.clone(),
+                                        None => continue,
+                                    };
+                                    if msg.broker_properties.sequence_number == Some(seq) {
+                                        match dp.complete_message(&lock_uri).await {
+                                            Ok(_) => found = true,
+                                            Err(e) => {
+                                                for uri in &abandoned_uris {
+                                                    let _ = dp.abandon_message(uri).await;
+                                                }
+                                                send_failed_with(&tx, "Delete failed", e);
+                                                return;
+                                            }
+                                        }
+                                        for uri in &abandoned_uris {
+                                            let _ = dp.abandon_message(uri).await;
+                                        }
+                                        break;
+                                    } else {
+                                        abandoned_uris.push(lock_uri);
+                                    }
+                                }
+                                Ok(None) => break,
+                                Err(e) => {
+                                    for uri in &abandoned_uris {
+                                        let _ = dp.abandon_message(uri).await;
+                                    }
+                                    send_failed_with(&tx, "Delete failed", e);
+                                    return;
+                                }
+                            }
+                        }
+
+                        if !found {
+                            for uri in &abandoned_uris {
+                                let _ = dp.abandon_message(uri).await;
+                            }
+                            send_failed(&tx, format!("Message seq #{} not found", seq));
+                        } else {
+                            let _ = tx.send(BgEvent::SingleDeleteComplete {
+                                sequence_number: seq,
+                                is_dlq: false,
+                            });
+                        }
+                    });
+                }
             }
         }
     }

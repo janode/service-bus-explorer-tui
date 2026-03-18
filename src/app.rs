@@ -22,6 +22,10 @@ pub enum BgEvent {
         deleted: u32,
         was_dlq: bool,
     },
+    SingleDeleteComplete {
+        sequence_number: i64,
+        is_dlq: bool,
+    },
     Cancelled {
         message: String,
     },
@@ -111,6 +115,11 @@ pub enum ActiveModal {
         count: u32,
         is_dlq: bool,
         is_topic: bool,
+    },
+    ConfirmSingleDelete {
+        entity_path: String,
+        sequence_number: i64,
+        is_dlq: bool,
     },
     PeekCountInput,
     EditResend,

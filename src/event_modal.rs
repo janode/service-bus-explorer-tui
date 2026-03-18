@@ -195,6 +195,15 @@ pub fn handle_modal_input(app: &mut App, key: KeyEvent) {
             }
             _ => {}
         },
+        ActiveModal::ConfirmSingleDelete { .. } => match key.code {
+            KeyCode::Char('y') | KeyCode::Char('Y') => {
+                app.set_status("Deleting message...");
+            }
+            KeyCode::Char('n') | KeyCode::Char('N') | KeyCode::Esc => {
+                app.modal = ActiveModal::None;
+            }
+            _ => {}
+        },
         ActiveModal::PeekCountInput => match key.code {
             KeyCode::Enter => {
                 if let Ok(count) = app.input_buffer.trim().parse::<i32>() {

@@ -99,6 +99,22 @@ pub fn render_modal(frame: &mut Frame, app: &mut App) {
                 Color::Red,
             );
         }
+        ActiveModal::ConfirmSingleDelete {
+            entity_path,
+            sequence_number,
+            is_dlq,
+        } => {
+            let target = if *is_dlq { "DLQ" } else { "queue" };
+            render_confirm_bulk(
+                frame,
+                "Delete Message",
+                &format!(
+                    "Delete message seq #{} from {} of '{}'?\nThis cannot be undone.",
+                    sequence_number, target, entity_path
+                ),
+                Color::Red,
+            );
+        }
         ActiveModal::PeekCountInput => render_peek_count_input(frame, app),
         ActiveModal::ClearOptions { entity_path, .. } => {
             render_clear_options(frame, entity_path);
