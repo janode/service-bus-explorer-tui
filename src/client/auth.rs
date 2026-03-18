@@ -47,6 +47,8 @@ pub struct ConnectionConfig {
     pub namespace: String,
     pub endpoint: String,
     pub auth_mode: AuthMode,
+    /// Whether this connection targets the local Service Bus emulator.
+    pub is_emulator: bool,
 }
 
 impl ConnectionConfig {
@@ -58,6 +60,7 @@ impl ConnectionConfig {
         let mut endpoint = None;
         let mut key_name = None;
         let mut key = None;
+        let mut is_emulator = false;
 
         for part in conn_str.split(';') {
             let part = part.trim();
@@ -72,6 +75,9 @@ impl ConnectionConfig {
                     "SharedAccessKey" => {
                         let idx = part.find('=').unwrap();
                         key = Some(part[idx + 1..].trim().to_string());
+                    }
+                    "UseDevelopmentEmulator" => {
+                        is_emulator = v.trim().eq_ignore_ascii_case("true");
                     }
                     _ => {}
                 }
@@ -93,16 +99,23 @@ impl ConnectionConfig {
             .trim_end_matches('/')
             .to_string();
 
-        // Normalize endpoint to https://
-        let https_endpoint = format!("https://{}", namespace);
+        // For the emulator, use HTTP on port 5300 (management/REST API port).
+        // Strip any port the user may have provided (e.g. :5672 is AMQP, not HTTP).
+        let resolved_endpoint = if is_emulator {
+            let host = namespace.split(':').next().unwrap_or(&namespace);
+            format!("http://{}:5300", host)
+        } else {
+            format!("https://{}", namespace)
+        };
 
         Ok(Self {
             namespace,
-            endpoint: https_endpoint,
+            endpoint: resolved_endpoint,
             auth_mode: AuthMode::Sas {
                 shared_access_key_name: key_name,
                 shared_access_key: key,
             },
+            is_emulator,
         })
     }
 
@@ -120,6 +133,7 @@ impl ConnectionConfig {
             namespace,
             endpoint,
             auth_mode: AuthMode::AzureAd { credential },
+            is_emulator: false,
         }
     }
 
@@ -204,12 +218,29 @@ mod tests {
         let cfg = ConnectionConfig::from_connection_string(cs).unwrap();
         assert_eq!(cfg.namespace, "myns.servicebus.windows.net");
         assert_eq!(cfg.endpoint, "https://myns.servicebus.windows.net");
+        assert!(!cfg.is_emulator);
         assert!(matches!(
             cfg.auth_mode,
             AuthMode::Sas { ref shared_access_key_name, ref shared_access_key }
             if shared_access_key_name == "RootManageSharedAccessKey"
                 && shared_access_key == "abc123def456=="
         ));
+    }
+
+    #[test]
+    fn parse_emulator_connection_string() {
+        let cs = "Endpoint=sb://localhost;SharedAccessKeyName=RootManageSharedAccessKey;SharedAccessKey=SAS_KEY_VALUE;UseDevelopmentEmulator=true";
+        let cfg = ConnectionConfig::from_connection_string(cs).unwrap();
+        assert!(cfg.is_emulator);
+        assert_eq!(cfg.endpoint, "http://localhost:5300");
+    }
+
+    #[test]
+    fn parse_emulator_strips_amqp_port() {
+        let cs = "Endpoint=sb://localhost:5672;SharedAccessKeyName=RootManageSharedAccessKey;SharedAccessKey=SAS_KEY_VALUE;UseDevelopmentEmulator=true";
+        let cfg = ConnectionConfig::from_connection_string(cs).unwrap();
+        assert!(cfg.is_emulator);
+        assert_eq!(cfg.endpoint, "http://localhost:5300");
     }
 
     #[test]
