@@ -54,6 +54,18 @@ brew install CosX/tap/service-bus-explorer-tui
 
 The `brew tap` command adds a third-party repository to Homebrew. After tapping, you can install and update the tool like any other Homebrew package.
 
+### Windows — winget
+
+```powershell
+winget install CosX.ServiceBusExplorerTui
+```
+
+### Windows — Chocolatey
+
+```powershell
+choco install service-bus-explorer-tui
+```
+
 ### cargo-binstall
 
 Fast installation of pre-built binaries via `cargo-binstall`:
@@ -90,7 +102,7 @@ Available platforms:
 | **Linux (ARM64)**     | `service-bus-explorer-tui-aarch64-unknown-linux-gnu`  |
 | **macOS (Intel)**     | `service-bus-explorer-tui-x86_64-apple-darwin`        |
 | **macOS (Apple Silicon)** | `service-bus-explorer-tui-aarch64-apple-darwin`   |
-| **Windows (x86_64)**  | `service-bus-explorer-tui-x86_64-pc-windows-msvc.exe` |
+| **Windows (x86_64)**  | `service-bus-explorer-tui-x86_64-pc-windows-msvc.zip` |
 
 **Extract and install:**
 

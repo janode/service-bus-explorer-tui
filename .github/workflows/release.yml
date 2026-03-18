@@ -198,3 +198,73 @@ jobs:
           git add Formula/service-bus-explorer-tui.rb
           git commit -m "Update service-bus-explorer-tui to ${{ steps.version.outputs.version }}"
           git push
+
+  publish-chocolatey:
+    name: Publish to Chocolatey
+    needs: release
+    runs-on: windows-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Download Windows release artifact
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          gh release download ${{ github.ref_name }} `
+            --repo ${{ github.repository }} `
+            --pattern "*-x86_64-pc-windows-msvc.zip"
+
+      - name: Calculate SHA256
+        id: sha256
+        shell: pwsh
+        run: |
+          $file = "${{ env.BINARY_NAME }}-${{ github.ref_name }}-x86_64-pc-windows-msvc.zip"
+          $hash = (Get-FileHash $file -Algorithm SHA256).Hash
+          echo "hash=$hash" >> $env:GITHUB_OUTPUT
+
+      - name: Extract version (strip v prefix)
+        id: version
+        shell: pwsh
+        run: |
+          $version = "${{ github.ref_name }}" -replace '^v', ''
+          echo "version=$version" >> $env:GITHUB_OUTPUT
+
+      - name: Generate package files
+        shell: pwsh
+        run: |
+          $url  = "https://github.com/${{ github.repository }}/releases/download/${{ github.ref_name }}/${{ env.BINARY_NAME }}-${{ github.ref_name }}-x86_64-pc-windows-msvc.zip"
+          $hash = "${{ steps.sha256.outputs.hash }}"
+          $ver  = "${{ steps.version.outputs.version }}"
+
+          (Get-Content chocolatey/service-bus-explorer-tui.nuspec) `
+            -replace '{{VERSION}}', $ver |
+            Set-Content chocolatey/service-bus-explorer-tui.nuspec
+
+          (Get-Content chocolatey/tools/chocolateyInstall.ps1) `
+            -replace '{{URL}}',    $url `
+            -replace '{{SHA256}}', $hash |
+            Set-Content chocolatey/tools/chocolateyInstall.ps1
+
+      - name: Pack
+        working-directory: chocolatey
+        run: choco pack service-bus-explorer-tui.nuspec
+
+      - name: Push to Chocolatey
+        working-directory: chocolatey
+        env:
+          CHOCOLATEY_API_KEY: ${{ secrets.CHOCOLATEY_API_KEY }}
+        run: |
+          choco push "service-bus-explorer-tui.${{ steps.version.outputs.version }}.nupkg" `
+            --source https://push.chocolatey.org/ `
+            --api-key $env:CHOCOLATEY_API_KEY
+
+  publish-winget:
+    name: Publish to Winget
+    needs: release
+    runs-on: ubuntu-latest
+    steps:
+      - uses: vedantmgoyal9/winget-releaser@v2
+        with:
+          identifier: CosX.ServiceBusExplorerTui
+          installers-regex: 'x86_64-pc-windows-msvc\.zip$'
+          token: ${{ secrets.WINGET_TOKEN }}

@@ -2196,7 +2196,7 @@ dependencies = [
 
 [[package]]
 name = "service-bus-explorer-tui"
-version = "0.0.13"
+version = "0.0.14"
 dependencies = [
  "anyhow",
  "azure_core",

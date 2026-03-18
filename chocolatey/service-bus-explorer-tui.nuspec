@@ -1,0 +1,21 @@
+<?xml version="1.0" encoding="utf-8"?>
+<package xmlns="http://schemas.microsoft.com/packaging/2015/06/nuspec.xsd">
+  <metadata>
+    <id>service-bus-explorer-tui</id>
+    <version>{{VERSION}}</version>
+    <title>Service Bus Explorer TUI</title>
+    <authors>Karl Solgård</authors>
+    <projectUrl>https://github.com/CosX/service-bus-explorer-tui</projectUrl>
+    <licenseUrl>https://github.com/CosX/service-bus-explorer-tui/blob/main/LICENSE</licenseUrl>
+    <requireLicenseAcceptance>false</requireLicenseAcceptance>
+    <description>A cross-platform terminal UI for managing Azure Service Bus.
+
+Browse queues, topics, and subscriptions. Peek, send, delete, and bulk-resend messages directly from the terminal. Supports SAS token and Azure AD authentication.</description>
+    <summary>Terminal UI for managing Azure Service Bus queues, topics, and messages.</summary>
+    <tags>azure service-bus tui terminal cli admin</tags>
+    <releaseNotes>https://github.com/CosX/service-bus-explorer-tui/releases/tag/v{{VERSION}}</releaseNotes>
+  </metadata>
+  <files>
+    <file src="tools\**" target="tools" />
+  </files>
+</package>
