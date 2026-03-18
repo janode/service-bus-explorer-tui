@@ -399,6 +399,44 @@ fn handle_message_input(app: &mut App, key: KeyEvent) {
                 }
             }
         }
+        // x = Delete single selected message
+        KeyCode::Char('x') => {
+            if !block_if_bg_running(app, BG_BUSY_MSG) {
+                let is_dlq = app.message_tab == MessageTab::DeadLetter;
+                let msg = if app.selected_message_detail.is_some() {
+                    app.selected_message_detail.clone()
+                } else {
+                    let msgs = if is_dlq {
+                        &app.dlq_messages
+                    } else {
+                        &app.messages
+                    };
+                    msgs.get(app.message_selected).cloned()
+                };
+                if let Some(msg) = msg {
+                    if let Some(seq) = msg.broker_properties.sequence_number {
+                        if let Some((path, _)) = app.selected_entity() {
+                            let entity_path = if is_dlq {
+                                msg.source_entity
+                                    .clone()
+                                    .unwrap_or_else(|| path.to_string())
+                            } else {
+                                path.to_string()
+                            };
+                            app.modal = ActiveModal::ConfirmSingleDelete {
+                                entity_path,
+                                sequence_number: seq,
+                                is_dlq,
+                            };
+                        }
+                    } else {
+                        app.set_status("Message has no sequence number");
+                    }
+                } else {
+                    app.set_status("No message selected");
+                }
+            }
+        }
         // e = Edit & resend selected message
         KeyCode::Char('e') => {
             if app.selected_message_detail.is_some() {

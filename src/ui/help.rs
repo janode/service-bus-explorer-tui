@@ -64,6 +64,7 @@ pub fn render_help(frame: &mut Frame) {
             "                 (on topics: fan-out across all subs)",
             Style::default().fg(Color::DarkGray),
         )),
+        Line::from("  x              Delete selected message"),
         Line::from("  e              Edit & resend (inline WYSIWYG)"),
         Line::from(vec![
             Span::styled("  C       ", Style::default().fg(Color::Yellow)),
