@@ -31,8 +31,10 @@ Built with Rust, [ratatui](https://ratatui.rs), and the Azure Service Bus REST A
 - Purge messages — concurrent delete, DLQ clear, or DLQ resend (with progress & cancellation)
 - Bulk resend DLQ → main entity and bulk delete from messages panel
 - Topic operations automatically fan out across all subscriptions
+- Delete individual messages from the messages panel with confirmation
 - Multiple saved connections with config persistence (SAS and Azure AD)
 - Azure AD (Microsoft Entra ID) authentication via default credential chain
+- Azure Service Bus emulator support (local development with `UseDevelopmentEmulator=true` connection strings)
 - Vim-style keybindings
 - Terminal escape injection protection for untrusted message content
 
@@ -165,6 +167,14 @@ On launch you'll see an empty tree panel. Press **`c`** to open the connection d
 
 Connections are saved to the config file for reconnection on next launch.
 
+#### Azure Service Bus Emulator
+
+For local development, connect using the emulator connection string:
+```
+Endpoint=sb://localhost;SharedAccessKeyName=RootManageSharedAccessKey;SharedAccessKey=<key>;UseDevelopmentEmulator=true
+```
+The TUI automatically routes to the emulator's HTTP port (5300).
+
 ### Copy messages across connections
 
 The copy message feature allows you to copy messages from one namespace to another with full editing support:
@@ -230,6 +240,7 @@ The copied message preserves all custom properties and metadata while allowing y
 | `1` / `2`       | Switch Messages / DLQ tab                 |
 | `Enter`          | View message detail                      |
 | `Esc`            | Close detail view                        |
+| `x`              | Delete selected message (with confirmation) |
 | `e`              | Edit & resend message (inline WYSIWYG)   |
 | `C` (shift)      | Copy message to different connection     |
 | `R` (shift)      | Bulk resend all DLQ → main entity        |
