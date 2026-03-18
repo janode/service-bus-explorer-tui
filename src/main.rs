@@ -486,7 +486,7 @@ async fn run_app(terminal: &mut Terminal<CrosstermBackend<io::Stdout>>) -> anyho
                 }
 
                 let credential: std::sync::Arc<dyn azure_core::credentials::TokenCredential> =
-                    match azure_identity::DefaultAzureCredential::new() {
+                    match azure_identity::DeveloperToolsCredential::new(None) {
                         Ok(cred) => cred,
                         Err(e) => {
                             let _ = bg_tx.send(BgEvent::DiscoveryFailed(format!(

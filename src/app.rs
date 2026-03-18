@@ -328,7 +328,7 @@ impl App {
 
     /// Connect to a Service Bus namespace using Azure AD (Microsoft Entra ID).
     pub fn connect_azure_ad(&mut self, namespace: &str) -> crate::client::Result<()> {
-        let credential = azure_identity::DefaultAzureCredential::new().map_err(|e| {
+        let credential = azure_identity::DeveloperToolsCredential::new(None).map_err(|e| {
             crate::client::ServiceBusError::Auth(format!("Azure AD credential error: {}", e))
         })?;
         let cfg = ConnectionConfig::from_azure_ad(namespace, credential);

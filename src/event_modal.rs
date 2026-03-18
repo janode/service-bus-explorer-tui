@@ -379,7 +379,7 @@ pub fn handle_modal_input(app: &mut App, key: KeyEvent) {
 
                     let config_result: Result<crate::client::ConnectionConfig, String> = if is_ad {
                         if let Some(ref ns) = conn.namespace {
-                            match azure_identity::DefaultAzureCredential::new() {
+                            match azure_identity::DeveloperToolsCredential::new(None) {
                                 Ok(cred) => {
                                     Ok(crate::client::ConnectionConfig::from_azure_ad(ns, cred))
                                 }

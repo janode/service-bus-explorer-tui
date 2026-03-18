@@ -164,7 +164,7 @@ impl ConnectionConfig {
     /// Acquire a Bearer token from Azure AD.
     async fn get_azure_ad_token(credential: &dyn TokenCredential) -> Result<String> {
         let token = credential
-            .get_token(&[SERVICE_BUS_SCOPE])
+            .get_token(&[SERVICE_BUS_SCOPE], None)
             .await
             .map_err(|e| ServiceBusError::Auth(format!("Azure AD token error: {}", e)))?;
         Ok(format!("Bearer {}", token.token.secret()))

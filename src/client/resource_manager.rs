@@ -76,7 +76,7 @@ impl ResourceManagerClient {
     async fn get_token(&self) -> Result<String, String> {
         let token = self
             .credential
-            .get_token(&["https://management.azure.com/.default"])
+            .get_token(&["https://management.azure.com/.default"], None)
             .await
             .map_err(|e| format!("Failed to get ARM token: {}", e))?;
 
