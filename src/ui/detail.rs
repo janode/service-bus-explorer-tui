@@ -107,7 +107,7 @@ pub fn render_detail(frame: &mut Frame, app: &App, area: Rect) {
 
             render_table(frame, area, block, rows);
         }
-        DetailView::Subscription(desc, runtime) => {
+        DetailView::Subscription(desc, runtime, rules) => {
             let mut rows = vec![
                 make_row("Name", &desc.name),
                 make_row("Topic", &desc.topic_name),
@@ -137,6 +137,13 @@ pub fn render_detail(frame: &mut Frame, app: &App, area: Rect) {
                     "Dead-letter",
                     &rt.dead_letter_message_count.to_string(),
                 ));
+            }
+
+            if !rules.is_empty() {
+                rows.push(make_row("──────────", "──────────"));
+                for rule in rules {
+                    rows.push(make_row(&rule.name, &rule.sql_expression));
+                }
             }
 
             render_table(frame, area, block, rows);

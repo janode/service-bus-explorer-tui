@@ -148,7 +148,7 @@ pub enum DetailView {
     None,
     Queue(QueueDescription, Option<QueueRuntimeInfo>),
     Topic(TopicDescription, Option<TopicRuntimeInfo>),
-    Subscription(SubscriptionDescription, Option<SubscriptionRuntimeInfo>),
+    Subscription(SubscriptionDescription, Option<SubscriptionRuntimeInfo>, Vec<SubscriptionRule>),
 }
 
 /// Tab for the message panel.

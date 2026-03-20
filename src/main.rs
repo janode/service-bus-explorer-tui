@@ -445,15 +445,18 @@ async fn run_app(terminal: &mut Terminal<CrosstermBackend<io::Stdout>>) -> anyho
                                 if let Some((topic, sub)) =
                                     entity_path::split_subscription_path(&path)
                                 {
-                                    match (
-                                        mgmt.get_subscription(topic, sub).await,
-                                        mgmt.get_subscription_runtime_info(topic, sub).await,
-                                    ) {
+                                    let (desc_res, rt_res, rules_res) = tokio::join!(
+                                        mgmt.get_subscription(topic, sub),
+                                        mgmt.get_subscription_runtime_info(topic, sub),
+                                        mgmt.list_subscription_rules(topic, sub),
+                                    );
+                                    let rules = rules_res.unwrap_or_default();
+                                    match (desc_res, rt_res) {
                                         (Ok(desc), Ok(rt)) => {
-                                            Some(DetailView::Subscription(desc, Some(rt)))
+                                            Some(DetailView::Subscription(desc, Some(rt), rules))
                                         }
                                         (Ok(desc), Err(_)) => {
-                                            Some(DetailView::Subscription(desc, None))
+                                            Some(DetailView::Subscription(desc, None, rules))
                                         }
                                         _ => None,
                                     }
