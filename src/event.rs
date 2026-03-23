@@ -138,8 +138,22 @@ fn handle_tree_input(app: &mut App, key: KeyEvent) {
         // 'r' = refresh (handled async in main loop via flag)
         KeyCode::Char('r') | KeyCode::F(5) => {
             if !block_if_bg_running(app, BG_BUSY_MSG) {
+                app.last_refresh = Some(std::time::Instant::now());
                 app.set_status("Refreshing...");
                 // Trigger async refresh — handled in main loop
+            }
+        }
+        // 't' = toggle auto-refresh timer
+        KeyCode::Char('t') => {
+            app.auto_refresh_enabled = !app.auto_refresh_enabled;
+            if app.auto_refresh_enabled {
+                app.last_refresh = Some(std::time::Instant::now());
+                app.set_status(format!(
+                    "Auto-refresh enabled (every {}s)",
+                    app.config.settings.auto_refresh_secs
+                ));
+            } else {
+                app.set_status("Auto-refresh disabled");
             }
         }
         // 's' = send message to selected entity

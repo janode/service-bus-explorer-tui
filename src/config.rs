@@ -46,7 +46,7 @@ impl Default for AppSettings {
     fn default() -> Self {
         Self {
             peek_count: 25,
-            auto_refresh_secs: 0, // 0 = disabled
+            auto_refresh_secs: 30,
             log_to_file: false,
         }
     }
