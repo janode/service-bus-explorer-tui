@@ -135,14 +135,14 @@ Require unit tests for domain logic, integration tests for infrastructure behavi
 
 ## Available Skills
 
-- `/add-operation` — Add a new async background operation using the sentinel dispatch pattern
-- `/add-keybinding` — Add or modify a keyboard shortcut
-- `/add-modal` — Add a new modal dialog overlay
-- `/add-ui-panel` — Add or modify a UI panel or rendering component
-- `/sb-rest-client` — Extend the Azure Service Bus REST API client
-- `/code-review` — Structured production-grade code review
-- `/rust-check` — Check code against Rust standards for this project
-- `/security-check` — Security-focused evaluation of code
+- `.claude/skills/add-operation.md` — Add a new async background operation using the sentinel dispatch pattern
+- `.claude/skills/add-keybinding.md` — Add or modify a keyboard shortcut
+- `.claude/skills/add-modal.md` — Add a new modal dialog overlay
+- `.claude/skills/add-ui-panel.md` — Add or modify a UI panel or rendering component
+- `.claude/skills/sb-rest-client.md` — Extend the Azure Service Bus REST API client
+- `.claude/skills/code-review.md` — Structured production-grade code review
+- `.claude/skills/rust-check.md` — Check code against Rust standards for this project
+- `.claude/skills/security-check.md` — Security-focused evaluation of code
 
 ## Common Pitfalls
 
