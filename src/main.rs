@@ -8,6 +8,7 @@ mod ui;
 
 use std::future::Future;
 use std::io;
+use std::time::Instant;
 
 use crossterm::{
     event::{DisableMouseCapture, EnableMouseCapture},
@@ -250,6 +251,7 @@ async fn run_app(terminal: &mut Terminal<CrosstermBackend<io::Stdout>>) -> anyho
                     }
 
                     app.loading = false;
+                    app.last_refresh = Some(Instant::now());
                     app.set_status(format!("Loaded {} queues, {} topics", q_count, t_count));
                 }
                 BgEvent::DetailLoaded(detail) => {
@@ -362,6 +364,21 @@ async fn run_app(terminal: &mut Terminal<CrosstermBackend<io::Stdout>>) -> anyho
         // Connection just established — trigger tree refresh
         if app.management.is_some() && app.tree.is_none() && !app.loading {
             needs_refresh = true;
+            app.last_refresh = Some(Instant::now());
+        }
+
+        // Auto-refresh timer check
+        if app.auto_refresh_enabled
+            && !app.bg_running
+            && !app.loading
+            && app.management.is_some()
+            && app.config.settings.auto_refresh_secs > 0
+        {
+            if let Some(last) = app.last_refresh {
+                if last.elapsed().as_secs() >= app.config.settings.auto_refresh_secs {
+                    needs_refresh = true;
+                }
+            }
         }
 
         // Refresh tree (spawned)

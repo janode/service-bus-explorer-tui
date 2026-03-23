@@ -1,6 +1,7 @@
 use ratatui::widgets::{ListState, TableState};
 use std::sync::atomic::{AtomicBool, Ordering};
 use std::sync::Arc;
+use std::time::Instant;
 use tokio::sync::mpsc;
 
 use crate::client::models::*;
@@ -220,6 +221,10 @@ pub struct App {
     // Loading indicator
     pub loading: bool,
 
+    // Auto-refresh
+    pub auto_refresh_enabled: bool,
+    pub last_refresh: Option<Instant>,
+
     // Persistent scroll state for stateful widgets
     pub tree_list_state: ListState,
     pub message_table_state: TableState,
@@ -241,6 +246,7 @@ pub struct App {
 impl App {
     pub fn new() -> Self {
         let config = AppConfig::load();
+        let auto_refresh_enabled = config.settings.auto_refresh_secs > 0;
         let (bg_tx, bg_rx) = mpsc::unbounded_channel();
         Self {
             running: true,
@@ -280,6 +286,8 @@ impl App {
             bg_running: false,
             bg_cancel: Arc::new(AtomicBool::new(false)),
             loading: false,
+            auto_refresh_enabled,
+            last_refresh: None,
             tree_list_state: ListState::default(),
             message_table_state: TableState::default(),
             detail_body_scroll: 0,
