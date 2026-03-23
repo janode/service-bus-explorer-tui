@@ -29,6 +29,7 @@ pub fn render_help(frame: &mut Frame) {
         )]),
         Line::from("  c              Connect / Switch connection"),
         Line::from("  r / F5         Refresh entities"),
+        Line::from("  t              Toggle auto-refresh timer"),
         Line::from(""),
         Line::from(vec![Span::styled(
             "  Entity Operations",
