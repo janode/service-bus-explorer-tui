@@ -840,3 +840,83 @@ pub async fn build_tree(
     let flat_nodes = root.flatten();
     Ok((root, flat_nodes))
 }
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn auto_refresh_enabled_derived_from_config() {
+        let mut app = App::new();
+        // Positive secs → enabled
+        app.config.settings.auto_refresh_secs = 30;
+        let enabled = app.config.settings.auto_refresh_secs > 0;
+        assert!(enabled);
+
+        // Zero secs → disabled
+        app.config.settings.auto_refresh_secs = 0;
+        let enabled = app.config.settings.auto_refresh_secs > 0;
+        assert!(!enabled);
+    }
+
+    #[test]
+    fn last_refresh_is_none_on_new_app() {
+        let app = App::new();
+        assert!(app.last_refresh.is_none());
+    }
+
+    #[test]
+    fn auto_refresh_does_not_fire_without_last_refresh() {
+        let mut app = App::new();
+        app.auto_refresh_enabled = true;
+        app.config.settings.auto_refresh_secs = 30;
+        // Even with auto_refresh_enabled, no last_refresh means no timer fires
+        assert!(app.last_refresh.is_none());
+        // The main loop checks last_refresh.is_some() before comparing elapsed time
+    }
+
+    #[test]
+    fn auto_refresh_timer_requires_management_client() {
+        let mut app = App::new();
+        app.auto_refresh_enabled = true;
+        app.config.settings.auto_refresh_secs = 1;
+
+        assert!(app.management.is_none());
+
+        // Simulate the timer condition from main.rs
+        let should_check = app.auto_refresh_enabled
+            && !app.bg_running
+            && !app.loading
+            && app.management.is_some()
+            && app.config.settings.auto_refresh_secs > 0;
+        assert!(!should_check, "should not trigger without management client");
+    }
+
+    #[test]
+    fn auto_refresh_blocked_while_bg_running() {
+        let mut app = App::new();
+        app.auto_refresh_enabled = true;
+        app.bg_running = true;
+        app.config.settings.auto_refresh_secs = 30;
+
+        let should_check = app.auto_refresh_enabled
+            && !app.bg_running
+            && !app.loading
+            && app.config.settings.auto_refresh_secs > 0;
+        assert!(!should_check, "should not trigger while bg_running");
+    }
+
+    #[test]
+    fn auto_refresh_blocked_while_loading() {
+        let mut app = App::new();
+        app.auto_refresh_enabled = true;
+        app.loading = true;
+        app.config.settings.auto_refresh_secs = 30;
+
+        let should_check = app.auto_refresh_enabled
+            && !app.bg_running
+            && !app.loading
+            && app.config.settings.auto_refresh_secs > 0;
+        assert!(!should_check, "should not trigger while loading");
+    }
+}

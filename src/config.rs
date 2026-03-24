@@ -38,8 +38,13 @@ impl SavedConnection {
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct AppSettings {
     pub peek_count: i32,
+    #[serde(default = "default_auto_refresh_secs")]
     pub auto_refresh_secs: u64,
     pub log_to_file: bool,
+}
+
+pub fn default_auto_refresh_secs() -> u64 {
+    30
 }
 
 impl Default for AppSettings {
@@ -139,4 +144,59 @@ fn dirs_fallback() -> PathBuf {
 
     // Fallback to current dir
     PathBuf::from(".")
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn default_auto_refresh_secs_is_30() {
+        let settings = AppSettings::default();
+        assert_eq!(settings.auto_refresh_secs, 30);
+    }
+
+    #[test]
+    fn auto_refresh_secs_zero_means_disabled() {
+        let settings = AppSettings {
+            auto_refresh_secs: 0,
+            ..Default::default()
+        };
+        assert_eq!(settings.auto_refresh_secs, 0);
+    }
+
+    #[test]
+    fn deserialize_auto_refresh_from_toml() {
+        let toml_str = r#"
+            [settings]
+            peek_count = 25
+            auto_refresh_secs = 60
+            log_to_file = false
+        "#;
+        let config: AppConfig = toml::from_str(toml_str).unwrap();
+        assert_eq!(config.settings.auto_refresh_secs, 60);
+    }
+
+    #[test]
+    fn deserialize_zero_auto_refresh_secs() {
+        let toml_str = r#"
+            [settings]
+            peek_count = 25
+            auto_refresh_secs = 0
+            log_to_file = false
+        "#;
+        let config: AppConfig = toml::from_str(toml_str).unwrap();
+        assert_eq!(config.settings.auto_refresh_secs, 0);
+    }
+
+    #[test]
+    fn deserialize_missing_auto_refresh_uses_default() {
+        let toml_str = r#"
+            [settings]
+            peek_count = 25
+            log_to_file = false
+        "#;
+        let config: AppConfig = toml::from_str(toml_str).unwrap();
+        assert_eq!(config.settings.auto_refresh_secs, 30);
+    }
 }

@@ -147,6 +147,10 @@ fn handle_tree_input(app: &mut App, key: KeyEvent) {
         KeyCode::Char('t') => {
             app.auto_refresh_enabled = !app.auto_refresh_enabled;
             if app.auto_refresh_enabled {
+                if app.config.settings.auto_refresh_secs == 0 {
+                    app.config.settings.auto_refresh_secs =
+                        crate::config::default_auto_refresh_secs();
+                }
                 app.last_refresh = Some(std::time::Instant::now());
                 app.set_status(format!(
                     "Auto-refresh enabled (every {}s)",
@@ -528,5 +532,126 @@ fn move_selection_up(selected: &mut usize) {
 fn move_selection_down(selected: &mut usize, len: usize) {
     if *selected + 1 < len {
         *selected += 1;
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use crossterm::event::{KeyCode, KeyEvent, KeyEventKind, KeyEventState, KeyModifiers};
+    use std::time::Instant;
+
+    fn press(code: KeyCode) -> KeyEvent {
+        KeyEvent {
+            code,
+            modifiers: KeyModifiers::NONE,
+            kind: KeyEventKind::Press,
+            state: KeyEventState::NONE,
+        }
+    }
+
+    fn new_app_on_tree() -> App {
+        let mut app = App::new();
+        app.focus = FocusPanel::Tree;
+        app
+    }
+
+    #[test]
+    fn toggle_auto_refresh_enables_when_disabled() {
+        let mut app = new_app_on_tree();
+        app.auto_refresh_enabled = false;
+        app.config.settings.auto_refresh_secs = 30;
+        app.last_refresh = None;
+
+        handle_tree_input(&mut app, press(KeyCode::Char('t')));
+
+        assert!(app.auto_refresh_enabled);
+        assert!(app.last_refresh.is_some());
+        assert!(app.status_message.contains("Auto-refresh enabled"));
+        assert!(app.status_message.contains("30"));
+    }
+
+    #[test]
+    fn toggle_auto_refresh_disables_when_enabled() {
+        let mut app = new_app_on_tree();
+        app.auto_refresh_enabled = true;
+        app.config.settings.auto_refresh_secs = 30;
+        app.last_refresh = Some(Instant::now());
+
+        handle_tree_input(&mut app, press(KeyCode::Char('t')));
+
+        assert!(!app.auto_refresh_enabled);
+        assert_eq!(app.status_message, "Auto-refresh disabled");
+    }
+
+    #[test]
+    fn toggle_auto_refresh_roundtrip() {
+        let mut app = new_app_on_tree();
+        app.auto_refresh_enabled = false;
+        app.config.settings.auto_refresh_secs = 30;
+
+        // Enable
+        handle_tree_input(&mut app, press(KeyCode::Char('t')));
+        assert!(app.auto_refresh_enabled);
+
+        // Disable
+        handle_tree_input(&mut app, press(KeyCode::Char('t')));
+        assert!(!app.auto_refresh_enabled);
+    }
+
+    #[test]
+    fn toggle_auto_refresh_resets_last_refresh_on_enable() {
+        let mut app = new_app_on_tree();
+        app.auto_refresh_enabled = false;
+        app.config.settings.auto_refresh_secs = 30;
+        // Simulate stale last_refresh from a previous enable/disable cycle
+        app.last_refresh = Some(Instant::now() - std::time::Duration::from_secs(999));
+
+        handle_tree_input(&mut app, press(KeyCode::Char('t')));
+
+        let last = app.last_refresh.unwrap();
+        // last_refresh should be very recent (within 1s)
+        assert!(last.elapsed().as_secs() < 1);
+    }
+
+    #[test]
+    fn toggle_auto_refresh_sets_default_when_secs_zero() {
+        let mut app = new_app_on_tree();
+        app.auto_refresh_enabled = false;
+        app.config.settings.auto_refresh_secs = 0;
+
+        handle_tree_input(&mut app, press(KeyCode::Char('t')));
+
+        assert!(app.auto_refresh_enabled);
+        assert_eq!(
+            app.config.settings.auto_refresh_secs,
+            crate::config::default_auto_refresh_secs()
+        );
+        assert!(app.status_message.contains("Auto-refresh enabled"));
+        assert!(app.last_refresh.is_some());
+    }
+
+    #[test]
+    fn manual_refresh_sets_last_refresh() {
+        let mut app = new_app_on_tree();
+        app.last_refresh = None;
+
+        handle_tree_input(&mut app, press(KeyCode::Char('r')));
+
+        assert!(app.last_refresh.is_some());
+        assert_eq!(app.status_message, "Refreshing...");
+    }
+
+    #[test]
+    fn manual_refresh_blocked_while_bg_running() {
+        let mut app = new_app_on_tree();
+        app.bg_running = true;
+        app.last_refresh = None;
+
+        handle_tree_input(&mut app, press(KeyCode::Char('r')));
+
+        // last_refresh should NOT be set when blocked
+        assert!(app.last_refresh.is_none());
+        assert_eq!(app.status_message, BG_BUSY_MSG);
     }
 }
